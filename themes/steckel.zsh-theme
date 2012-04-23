@@ -17,6 +17,14 @@ ZSH_THEME_GIT_PROMPT_REMOTE_AHEAD="%{$fg[green]%}↑"
 ZSH_THEME_GIT_PROMPT_REMOTE_BEHIND="%{$fg[red]%}↓"
 ZSH_THEME_GIT_PROMPT_UNTRACKED="%{$fg[red]%}…"
 
+
+ZSH_THEME_SVN_PROMPT_DIRTY=$ZSH_THEME_GIT_PROMPT_DIRTY
+ZSH_THEME_SVN_PROMPT_CLEAN=$ZSH_THEME_GIT_PROMPT_CLEAN
+ZSH_THEME_SVN_PROMPT_ADDED=$ZSH_THEME_GIT_PROMPT_STAGED
+ZSH_THEME_SVN_PROMPT_MODIFIED=$ZSH_THEME_GIT_PROMPT_STAGED
+ZSH_THEME_SVN_PROMPT_DELETED=$ZSH_THEME_GIT_PROMPT_REMOTE_BEHIND
+ZSH_THEME_SVN_PROMPT_UNTRACKED=$ZSH_THEME_GIT_PROMPT_UNTRACKED
+ZSH_THEME_SVN_PROMPT_CONFLICTED=$ZSH_THEME_GIT_PROMPT_CONFLICTS
 ###
 #   LESS CONFIGURABLE STUFF YOU PROBABLY SHOULD'NT EDIT
 ###
@@ -51,6 +59,81 @@ function precmd_update_git_vars() {
 function chpwd_update_git_vars() {
     update_current_git_vars
 }
+
+# SVN FUNCTIONS
+function in_svn() {
+    if [[ -d .svn ]]; then
+        echo 1
+    fi
+}
+
+function svn_get_repo_name {
+    if [ $(in_svn) ]; then
+        svn info | sed -n 's/Repository\ Root:\ .*\///p' | read SVN_ROOT
+
+        svn info | sed -n "s/URL:\ .*$SVN_ROOT\///p" | sed "s/\/.*$//"
+    fi
+}
+
+function svn_get_rev_nr {
+    if [ $(in_svn) ]; then
+        svn info 2> /dev/null | sed -n s/Revision:\ //p
+    fi
+}
+
+function svn_dirty_choose {
+    if [ $(in_svn) ]; then
+        s=$(svn status|grep -E '^\s*[ACDIM!?L]' 2>/dev/null)
+        if [ $s ]; then
+            echo $1
+        else
+            echo $2
+        fi
+    fi
+}
+
+function svn_dirty {
+    svn_dirty_choose $ZSH_THEME_SVN_PROMPT_DIRTY $ZSH_THEME_SVN_PROMPT_CLEAN
+}
+
+svn_prompt_status() {
+  INDEX=$(svn status 2> /dev/null) || return
+  STATUS=""
+  if $(echo "$INDEX" | grep '^? '  &> /dev/null); then
+		TEMP=$(echo "$INDEX" | grep '^? '|wc -l|sed -e 's/[ ]*//g')
+    STATUS="$ZSH_THEME_SVN_PROMPT_UNTRACKED$TEMP$STATUS"
+  fi
+  if $(echo "$INDEX" | grep '^A  ' &> /dev/null); then
+		TEMP=$(echo "$INDEX" | grep '^A '|wc -l|sed -e 's/[ ]*//g')
+		STATUS="$ZSH_THEME_SVN_PROMPT_ADDED$TEMP$STATUS"
+  elif $(echo "$INDEX" | grep '^AM  ' &> /dev/null); then
+		TEMP=$(echo "$INDEX" | grep '^AM '|wc -l|sed -e 's/[ ]*//g')
+    STATUS="$ZSH_THEME_SVN_PROMPT_ADDED$TEMP$STATUS"
+  fi
+  if $(echo "$INDEX" | grep '^M ' &> /dev/null); then
+		TEMP=$(echo "$INDEX" | grep '^M '|wc -l|sed -e 's/[ ]*//g')
+    STATUS="$ZSH_THEME_SVN_PROMPT_MODIFIED$TEMP$STATUS"
+  elif $(echo "$INDEX" | grep '^AM ' &> /dev/null); then
+		TEMP=$(echo "$INDEX" | grep '^AM '|wc -l|sed -e 's/[ ]*//g')
+    STATUS="$ZSH_THEME_SVN_PROMPT_MODIFIED$TEMP$STATUS"
+  fi
+  if $(echo "$INDEX" | grep '^C  ' &> /dev/null); then
+		TEMP=$(echo "$INDEX" | grep '^C '|wc -l|sed -e 's/[ ]*//g')
+    STATUS="$ZSH_THEME_SVN_PROMPT_CONFLICTED$TEMP$STATUS"
+  elif $(echo "$INDEX" | grep '^AC ' &> /dev/null); then
+		TEMP=$(echo "$INDEX" | grep '^AC '|wc -l|sed -e 's/[ ]*//g')
+    STATUS="$ZSH_THEME_SVN_PROMPT_CONFLICTED$TEMP$STATUS"
+  fi
+  if $(echo "$INDEX" | grep '^D ' &> /dev/null); then
+		TEMP=$(echo "$INDEX" | grep '^D '|wc -l|sed -e 's/[ ]*//g')
+    STATUS="$ZSH_THEME_SVN_PROMPT_DELETED$TEMP$STATUS"
+  elif $(echo "$INDEX" | grep '^AD ' &> /dev/null); then
+		TEMP=$(echo "$INDEX" | grep '^AD '|wc -l|sed -e 's/[ ]*//g')
+    STATUS="$ZSH_THEME_SVN_PROMPT_DELETED$TEMP$STATUS"
+  fi
+  echo $STATUS
+}
+
 
 # LETS GET SOME BASH VARS OUT OF THAT PYTHON LIB FILE
 function update_current_git_vars() {
@@ -131,15 +214,24 @@ function super_user_toggle() {
   fi
 }
 
-function git_status() {
-  ref=$(git symbolic-ref HEAD 2> /dev/null) || return
+function right_prompt() {
   if $SUPERUSER; then
-    echo "$(git_conflicts) $GIT_BRANCH$(git_remote_status) $(git_advanced_dirt) $(git_prompt_short_sha)"
+		if [ $(in_svn) ]; then
+    	echo "$(svn_get_repo_name) $(svn_prompt_status) $(svn_dirty) $(svn_get_rev_nr)"
+		else
+			ref=$(git symbolic-ref HEAD 2> /dev/null) || return
+    	echo "$(git_conflicts) $GIT_BRANCH$(git_remote_status) $(git_advanced_dirt) $(git_prompt_short_sha)"
+		fi
   else
-    echo "$GIT_BRANCH $(git_dirt) $(git_prompt_short_sha)"
+		if [ $(in_svn) ]; then
+    	echo "$(svn_get_repo_name) $(svn_dirty) $(svn_get_rev_nr)"
+		else
+			ref=$(git symbolic-ref HEAD 2> /dev/null) || return
+    	echo "$GIT_BRANCH $(git_dirt) $(git_prompt_short_sha)"
+		fi
   fi
 }
 
 # OUR PROMPTS!
 PROMPT='%c > '
-RPS1='$(git_status)'
+RPS1='$(right_prompt)'
