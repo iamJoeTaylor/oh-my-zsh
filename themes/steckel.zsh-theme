@@ -83,22 +83,28 @@ function svn_get_rev_nr {
 }
 
 function svn_dirty_choose {
+	
     if [ $(in_svn) ]; then
-        s=$(svn status|grep -E '^\s*[ACDIM!?L]' 2>/dev/null)
-        if [ $s ]; then
-            echo $1
+        if [ -z "`svn status -q`" ]; then
+            echo $ZSH_THEME_SVN_PROMPT_CLEAN
         else
-            echo $2
+            echo $ZSH_THEME_SVN_PROMPT_DIRTY
         fi
     fi
 }
 
 function svn_dirty {
-    svn_dirty_choose $ZSH_THEME_SVN_PROMPT_DIRTY $ZSH_THEME_SVN_PROMPT_CLEAN
+  if [ $(in_svn) ]; then
+      if [ -z "`svn status -q`" ]; then
+          echo $ZSH_THEME_SVN_PROMPT_CLEAN
+      else
+          echo $ZSH_THEME_SVN_PROMPT_DIRTY
+      fi
+  fi
 }
 
 svn_prompt_status() {
-  INDEX=$(svn status 2> /dev/null) || return
+  INDEX=$(svn status -q 2> /dev/null) || return
   STATUS=""
   if $(echo "$INDEX" | grep '^? '  &> /dev/null); then
 		TEMP=$(echo "$INDEX" | grep '^? '|wc -l|sed -e 's/[ ]*//g')
