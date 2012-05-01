@@ -22,3 +22,8 @@ alias sl=ls # often screw this up
 
 alias afind='ack-grep -il'
 
+# SVN
+alias svst='svn status'
+alias svstu='svn status -u'
+alias svup='svn up'
+
