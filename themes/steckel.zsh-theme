@@ -62,7 +62,8 @@ function chpwd_update_git_vars() {
 
 # SVN FUNCTIONS
 function in_svn() {
-    if [[ -d .svn ]]; then
+		local OUTPUT="`svn info 2>&1 | grep 'not a working copy'`"
+    if [ -z "$OUTPUT" ]; then
         echo 1
     fi
 }
